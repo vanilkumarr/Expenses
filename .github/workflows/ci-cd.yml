@@ -2,9 +2,9 @@ name: Paisa Tracker CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   # ─── JOB 1: Test the backend ───────────────────────────────
