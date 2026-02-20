@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
-        run: npm install
+        run: npm install --build-from-source
 
       - name: Run tests
         working-directory: backend
