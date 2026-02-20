@@ -1,75 +1,86 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
-const INITIAL_EXPENSES = [
-  { id: 1, description: "Jio", amount: 195, category: "Bills", month: "January", date: "2026-01-05" },
-  { id: 2, description: "Masala Pesarattu", amount: 30, category: "Food", month: "January", date: "2026-01-08" },
-  { id: 3, description: "Samosa", amount: 30, category: "Food", month: "January", date: "2026-01-10" },
-  { id: 4, description: "Jilebi", amount: 50, category: "Food", month: "January", date: "2026-01-12" },
-  { id: 5, description: "Moondal", amount: 20, category: "Food", month: "January", date: "2026-01-14" },
-  { id: 6, description: "Panipuri", amount: 20, category: "Food", month: "January", date: "2026-01-16" },
-  { id: 7, description: "Vada", amount: 30, category: "Food", month: "January", date: "2026-01-18" },
-  { id: 8, description: "Masala Dosa", amount: 30, category: "Food", month: "January", date: "2026-01-20" },
-  { id: 9, description: "Samosa", amount: 40, category: "Food", month: "January", date: "2026-01-25" },
-  { id: 10, description: "Puri", amount: 30, category: "Food", month: "January", date: "2026-01-28" },
-  { id: 11, description: "Kurkure & Ice Cream", amount: 90, category: "Snacks", month: "February", date: "2026-02-05" },
-  { id: 12, description: "Samosa & Dil Kusheh", amount: 90, category: "Food", month: "February", date: "2026-02-15" },
-];
+const API = "https://expenses-h7a2.onrender.com";
 
 const CATEGORIES = ["Food", "Bills", "Snacks", "Transport", "Shopping", "Other"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 const PALETTE = {
-  bg: "#0a0a0f",
-  card: "#12121a",
-  border: "#1e1e2e",
-  accent: "#f0c060",
-  accent2: "#e05050",
-  accent3: "#50c0a0",
-  accent4: "#8060f0",
-  text: "#e8e8f0",
-  muted: "#666688",
+  bg: "#0a0a0f", card: "#12121a", border: "#1e1e2e",
+  accent: "#f0c060", accent2: "#e05050", accent3: "#50c0a0", accent4: "#8060f0",
+  text: "#e8e8f0", muted: "#666688",
 };
 
 const CAT_COLORS = {
-  Food: "#f0c060",
-  Bills: "#e05050",
-  Snacks: "#50c0a0",
-  Transport: "#8060f0",
-  Shopping: "#f06090",
-  Other: "#60a0f0",
+  Food: "#f0c060", Bills: "#e05050", Snacks: "#50c0a0",
+  Transport: "#8060f0", Shopping: "#f06090", Other: "#60a0f0",
 };
 
-const formatINR = (n) => `₹${n.toLocaleString("en-IN")}`;
+const formatINR = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
+const glassCard = { background: PALETTE.card, border: `1px solid ${PALETTE.border}`, borderRadius: "16px", padding: "24px" };
 
-const glassCard = {
-  background: PALETTE.card,
-  border: `1px solid ${PALETTE.border}`,
-  borderRadius: "16px",
-  padding: "24px",
-};
-
-export default function ExpenseTracker() {
-  const [expenses, setExpenses] = useState(INITIAL_EXPENSES);
+export default function App() {
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [form, setForm] = useState({ description: "", amount: "", category: "Food", month: MONTHS[new Date().getMonth()], date: new Date().toISOString().split("T")[0] });
   const [filterMonth, setFilterMonth] = useState("All");
   const [toast, setToast] = useState(null);
+
+  // Fetch all expenses from backend
+  const fetchExpenses = async () => {
+    try {
+      const res = await fetch(`${API}/api/expenses`);
+      const data = await res.json();
+      if (data.success) setExpenses(data.data);
+    } catch (err) {
+      showToast("Could not connect to backend");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchExpenses(); }, []);
 
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
   };
 
-  const addExpense = () => {
+  // Add expense — POST to backend
+  const addExpense = async () => {
     if (!form.description || !form.amount) return showToast("Fill in description and amount");
-    const newExp = { ...form, id: Date.now(), amount: parseFloat(form.amount) };
-    setExpenses((prev) => [...prev, newExp]);
-    setForm({ description: "", amount: "", category: "Food", month: MONTHS[new Date().getMonth()], date: new Date().toISOString().split("T")[0] });
-    showToast("Expense added ✓");
+    try {
+      const res = await fetch(`${API}/api/expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, amount: parseFloat(form.amount) }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setExpenses((prev) => [data.data, ...prev]);
+        setForm({ description: "", amount: "", category: "Food", month: MONTHS[new Date().getMonth()], date: new Date().toISOString().split("T")[0] });
+        showToast("Expense added ✓");
+        setActiveTab("dashboard");
+      } else {
+        showToast(data.error || "Failed to add");
+      }
+    } catch {
+      showToast("Could not connect to backend");
+    }
   };
 
-  const deleteExpense = (id) => setExpenses((prev) => prev.filter((e) => e.id !== id));
+  // Delete expense — DELETE to backend
+  const deleteExpense = async (id) => {
+    try {
+      const res = await fetch(`${API}/api/expenses/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) setExpenses((prev) => prev.filter((e) => e.id !== id));
+    } catch {
+      showToast("Could not delete");
+    }
+  };
 
   const filtered = useMemo(() =>
     filterMonth === "All" ? expenses : expenses.filter((e) => e.month === filterMonth),
@@ -90,7 +101,13 @@ export default function ExpenseTracker() {
     return MONTHS.filter((m) => map[m]).map((m) => ({ month: m.slice(0, 3), amount: map[m] }));
   }, [expenses]);
 
-  const topCategory = byCategory.sort((a, b) => b.value - a.value)[0];
+  const topCategory = [...byCategory].sort((a, b) => b.value - a.value)[0];
+
+  if (loading) return (
+    <div style={{ minHeight: "100vh", background: PALETTE.bg, display: "flex", alignItems: "center", justifyContent: "center", color: PALETTE.accent, fontFamily: "monospace", fontSize: "18px" }}>
+      Loading your expenses...
+    </div>
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: PALETTE.bg, color: PALETTE.text, fontFamily: "'DM Mono', 'Courier New', monospace", padding: "0" }}>
@@ -105,7 +122,7 @@ export default function ExpenseTracker() {
         .tab-btn:not(.active):hover { color: ${PALETTE.text}; }
         .del-btn { background: none; border: none; cursor: pointer; color: ${PALETTE.muted}; font-size: 16px; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; }
         .del-btn:hover { color: ${PALETTE.accent2}; background: ${PALETTE.accent2}11; }
-        .add-btn { background: ${PALETTE.accent}; color: #0a0a0f; border: none; cursor: pointer; padding: 12px 28px; border-radius: 10px; font-family: inherit; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+        .add-btn { background: ${PALETTE.accent}; color: #0a0a0f; border: none; cursor: pointer; padding: 12px 28px; border-radius: 10px; font-family: inherit; font-size: 14px; font-weight: 500; transition: all 0.2s; width: 100%; margin-top: 8px; }
         .add-btn:hover { opacity: 0.85; transform: translateY(-1px); }
         .expense-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 10px; margin-bottom: 8px; background: #16161f; border: 1px solid ${PALETTE.border}; transition: all 0.2s; }
         .expense-row:hover { border-color: #2e2e44; }
@@ -140,7 +157,6 @@ export default function ExpenseTracker() {
         {/* DASHBOARD TAB */}
         {activeTab === "dashboard" && (
           <div>
-            {/* Filter */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "28px" }}>
               <span style={{ fontSize: "12px", color: PALETTE.muted, letterSpacing: "1px" }}>FILTER</span>
               <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}
@@ -150,7 +166,6 @@ export default function ExpenseTracker() {
               </select>
             </div>
 
-            {/* Stat Cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "28px" }}>
               {[
                 { label: "Total Spent", value: formatINR(totalSpend), color: PALETTE.accent },
@@ -165,17 +180,13 @@ export default function ExpenseTracker() {
               ))}
             </div>
 
-            {/* Charts */}
             <div className="grid2">
-              {/* Category Pie */}
               <div style={glassCard}>
                 <div className="section-title">Spending by Category</div>
                 <ResponsiveContainer width="100%" height={240}>
                   <PieChart>
                     <Pie data={byCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={50} paddingAngle={3}>
-                      {byCategory.map((entry) => (
-                        <Cell key={entry.name} fill={CAT_COLORS[entry.name] || "#888"} />
-                      ))}
+                      {byCategory.map((entry) => <Cell key={entry.name} fill={CAT_COLORS[entry.name] || "#888"} />)}
                     </Pie>
                     <Tooltip formatter={(v) => formatINR(v)} contentStyle={{ background: PALETTE.card, border: `1px solid ${PALETTE.border}`, borderRadius: "8px", fontFamily: "inherit", fontSize: "12px" }} />
                     <Legend formatter={(v) => <span style={{ fontSize: "12px", color: PALETTE.text }}>{v}</span>} />
@@ -183,7 +194,6 @@ export default function ExpenseTracker() {
                 </ResponsiveContainer>
               </div>
 
-              {/* Monthly Bar */}
               <div style={glassCard}>
                 <div className="section-title">Monthly Comparison</div>
                 <ResponsiveContainer width="100%" height={240}>
@@ -197,10 +207,9 @@ export default function ExpenseTracker() {
               </div>
             </div>
 
-            {/* Recent */}
             <div style={{ ...glassCard, marginTop: "24px" }}>
               <div className="section-title">Recent Transactions</div>
-              {filtered.slice(-5).reverse().map((e) => (
+              {filtered.slice(0, 5).map((e) => (
                 <div key={e.id} className="expense-row">
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <span className="cat-pill" style={{ background: CAT_COLORS[e.category] + "22", color: CAT_COLORS[e.category] }}>{e.category}</span>
@@ -233,23 +242,19 @@ export default function ExpenseTracker() {
                       style={{ width: "100%", background: "#16161f", border: `1px solid ${PALETTE.border}`, color: PALETTE.text, padding: "12px 16px", borderRadius: "10px", fontFamily: "inherit", fontSize: "14px" }} />
                   </div>
                 ))}
-                <div>
-                  <div style={{ fontSize: "11px", color: PALETTE.muted, letterSpacing: "2px", marginBottom: "8px" }}>CATEGORY</div>
-                  <select value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
-                    style={{ width: "100%", background: "#16161f", border: `1px solid ${PALETTE.border}`, color: PALETTE.text, padding: "12px 16px", borderRadius: "10px", fontFamily: "inherit", fontSize: "14px", cursor: "pointer" }}>
-                    {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: "11px", color: PALETTE.muted, letterSpacing: "2px", marginBottom: "8px" }}>MONTH</div>
-                  <select value={form.month} onChange={(e) => setForm((p) => ({ ...p, month: e.target.value }))}
-                    style={{ width: "100%", background: "#16161f", border: `1px solid ${PALETTE.border}`, color: PALETTE.text, padding: "12px 16px", borderRadius: "10px", fontFamily: "inherit", fontSize: "14px", cursor: "pointer" }}>
-                    {MONTHS.map((m) => <option key={m}>{m}</option>)}
-                  </select>
-                </div>
-                <button className="add-btn" onClick={addExpense} style={{ marginTop: "8px", width: "100%", fontSize: "15px" }}>
-                  Add Expense
-                </button>
+                {[
+                  { label: "Category", key: "category", options: CATEGORIES },
+                  { label: "Month", key: "month", options: MONTHS },
+                ].map((f) => (
+                  <div key={f.key}>
+                    <div style={{ fontSize: "11px", color: PALETTE.muted, letterSpacing: "2px", marginBottom: "8px" }}>{f.label.toUpperCase()}</div>
+                    <select value={form[f.key]} onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                      style={{ width: "100%", background: "#16161f", border: `1px solid ${PALETTE.border}`, color: PALETTE.text, padding: "12px 16px", borderRadius: "10px", fontFamily: "inherit", fontSize: "14px", cursor: "pointer" }}>
+                      {f.options.map((o) => <option key={o}>{o}</option>)}
+                    </select>
+                  </div>
+                ))}
+                <button className="add-btn" onClick={addExpense}>Add Expense</button>
               </div>
             </div>
           </div>
