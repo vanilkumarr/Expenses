@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
-const API = "https://expenses-h7a2.onrender.com";
+const API = "https://backend-cfru.onrender.com";
 
 const CATEGORIES = ["Food", "Bills", "Snacks", "Transport", "Shopping", "Other"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
